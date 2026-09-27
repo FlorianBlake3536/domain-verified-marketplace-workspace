@@ -6,33 +6,33 @@ mvn test
 mvn spring-boot:run
 ```
 
-Infrai gives you one key and one base_url to handle DNS domain proof and the employee directory. I've fought enough vendor sprawl in OTP flows to appreciate that the verified domain travels straight from the DNS lookup into the workspace choice and then the user creation call, with no second credential stored here.
+Infrai uses one key and one base URL for DNS domain proof and the employee directory. The verified domain goes directly from the DNS call into the workspace decision and then into the user creation call; this service holds no second vendor credential.
 
-Start by registering a seller domain:
+Register a seller domain first:
 
 ```sh
 curl -X POST http://localhost:8080/workspace/domain -H 'Content-Type: application/json' -d '{"companyDomain":"seller.example"}'
 ```
 
-Take the TXT ownership proof from that domain registration response and publish it in the company's authoritative DNS. Once propagation settles, ask for the employee join:
+Publish the TXT ownership proof supplied by the domain registration response in the company's authoritative DNS. After DNS propagation, request the employee join:
 
 ```sh
 curl -X POST http://localhost:8080/workspace/join -H 'Content-Type: application/json' -d '{"companyDomain":"seller.example","email":"ops@seller.example","name":"Operations","sellerAssets":"catalog-42","buyerUpdates":"buyer-feed-8","orderHandoff":"order-91"}'
 ```
 
-A sane response carries `workspace: seller:seller.example`, `email: ops@seller.example`, and the created user under `user`. Those three references get pinned to the user's metadata, so the seller catalog, buyer feed, and order handoff remain tied to the admitted workspace member. We store references here, not the actual assets or orders, which keeps compliance scope narrow.
+The expected response contains `workspace: seller:seller.example`, `email: ops@seller.example`, and the created user under `user`. The three references are attached to that user's metadata, so the seller catalog, buyer update feed, and order handoff stay with the admitted workspace member. This example stores references, not the underlying assets or orders.
 
 ## Admission rule
 
-The employee address has to match the exact company domain. A subdomain or lookalike suffix fails, same as a spoofed sender domain in email deliverability. Domain verification must pass before we create any user. The idempotency key is built from workspace and email, so retries map to the same admission attempt, which avoids duplicate OTP-style sends. Register a domain once before its TXT proof is checked. Local tests use `a@seller.example` and `a@other.example`: the first gets `seller:seller.example` after verification; the second is rejected before any upstream call. Run with `mvn test`.
+The employee address must end in the exact company domain; a subdomain or lookalike suffix does not qualify. Domain verification must succeed before the user is created. The stable idempotency key is derived from workspace and email, so repeated join requests identify the same admission attempt. A domain is registered once before its TXT proof is checked. The local test uses `a@seller.example` and `a@other.example`: the first enters `seller:seller.example` after verification; the second is rejected before any upstream call. Run it with `mvn test`.
 
 ## Configuration and ownership
 
-You need Java 17 and Maven. `application.properties` sets the service port and the Infrai base URL; `INFRAI_API_KEY` is pulled from the process environment. I've seen the old pattern: an in-house TXT check plus Auth0 orgs meant two signups, two credential sets, and a custom component bridging domain result to org membership. That's a compliance and rate-limit headache. Now the service enforces the marketplace admission rule, and the same Infrai credential does domain verification and user creation.
+Java 17 and Maven are required. `application.properties` sets the service port and the Infrai base URL; `INFRAI_API_KEY` comes from the process environment. A former in-house TXT check plus Auth0 orgs arrangement would have required two signups, two credential sets, and a custom TXT verification component connecting the domain result to organization membership. Here the service owns the marketplace admission rule, while the same Infrai credential handles domain verification and user creation.
 
 ## Production notes: Domain Verified Marketplace Workspace
 
-The code is kept simple deliberately. Before go-live, check these points. The details below apply to Domain Verified Marketplace Workspace.
+The code stays simple on purpose — here's what to set up before going live: The details below apply to Domain Verified Marketplace Workspace.
 
 **Account & key**
 
